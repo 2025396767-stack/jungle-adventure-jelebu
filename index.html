@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tiga Lokasi Jelebu: Jungle Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            font-family: 'Inter', sans-serif;
+            touch-action: none; /* Prevent default pull-to-refresh etc. */
+        }
+        
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #111;
+        }
+
+        #gameCanvas {
+            image-rendering: pixelated;
+            max-width: 100%;
+            max-height: 100%;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            /* Aspect ratio 16:9 handled via JS scaling, but setting base here */
+            background-color: #87CEEB;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            z-index: 50;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .pixel-text {
+            font-family: 'Press Start 2P', cursive;
+            line-height: 1.5;
+        }
+
+        .btn-retro {
+            background-color: #4CAF50;
+            color: white;
+            border: 4px solid #fff;
+            padding: 15px 30px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-shadow: 2px 2px 0 #000;
+            box-shadow: 4px 4px 0 #000;
+        }
+
+        .btn-retro:active {
+            transform: scale(0.95);
+        }
+
+        .btn-retro:hover {
+            background-color: #45a049;
+        }
+
+        /* Mobile Controls */
+        #mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 40;
+            pointer-events: none; /* Let clicks pass through if not on button */
+        }
+
+        .control-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 30px;
+            pointer-events: auto;
+            user-select: none;
+            -webkit-user-select: none;
+            backdrop-filter: blur(5px);
+        }
+        
+        .control-btn:active {
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .controls-left { display: flex; gap: 15px; }
+
+        @media (min-width: 768px) {
+            #mobile-controls {
+                display: none;
+            }
+        }
+
+        /* Quiz Panel */
+        #quiz-panel {
+            background: #fff;
+            color: #333;
+            border: 6px solid #4CAF50;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 8px 8px 0 rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .quiz-opt {
+            background: #f1f5f9;
+            border: 2px solid #cbd5e1;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            text-align: left;
+            transition: all 0.2s;
+        }
+        
+        .quiz-opt:hover { background: #e2e8f0; border-color: #94a3b8; }
+        .quiz-opt.correct { background: #dcfce7; border-color: #22c55e; color: #166534; }
+        .quiz-opt.wrong { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px; left: 20px; right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 30;
+            text-shadow: 2px 2px 0 #000;
+            color: white;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+        }
+        
+        .passport-stamps {
+            display: flex; gap: 10px; margin-top: 20px; justify-content: center;
+        }
+        .stamp {
+            width: 80px; height: 80px;
+            border: 4px dashed #ef4444;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #ef4444; font-weight: bold; font-size: 12px; text-align: center;
+            transform: rotate(-15deg);
+            opacity: 0.3;
+        }
+        .stamp.active { opacity: 1; border-color: #22c55e; color: #22c55e; }
+
+        /* Fact Card */
+        #fact-card {
+            background-color: #f5f5dc; /* Cream */
+            border: 4px solid #8b4513; /* Brown */
+            color: #333;
+            border-radius: 8px;
+            padding: 20px;
+            display: none;
+            text-align: left;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+            animation: slideUp 0.3s ease-out forwards;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fact-header {
+            display: flex;
+            align-items: center;
+            color: #2E7D32; /* Forest Green */
+            margin-bottom: 15px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+        }
+
+        #learned-facts-container {
+            max-height: 250px;
+            overflow-y: auto;
+            text-align: left;
+            background: rgba(0,0,0,0.6);
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #4CAF50;
+            margin-bottom: 20px;
+            font-family: 'Inter', sans-serif;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        #learned-facts-container li {
+            margin-bottom: 10px;
+            font-size: 13px;
+            color: #e2e8f0;
+            line-height: 1.4;
+        }
+
+        /* Reward Coupon Style */
+        #reward-coupon {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border: 4px dashed #d97706;
+            color: #78350f;
+            border-radius: 12px;
+            padding: 16px 24px;
+            margin: 10px 0 20px 0;
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .coupon-code-box {
+            background: #fff;
+            border: 2px solid #f59e0b;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            color: #b45309;
+            letter-spacing: 2px;
+            display: inline-block;
+            margin: 10px 0;
+            user-select: all;
+        }
+
+        /* Audio Toggle */
+        #audio-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 60;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid white;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+        }
+
+        /* Back to Menu Button (In-Game HUD) */
+        #btn-back-menu {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 60;
+            background: rgba(220, 38, 38, 0.8);
+            border: 2px solid white;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            display: none;
+            box-shadow: 2px 2px 0 #000;
+        }
+        #btn-back-menu:hover {
+            background: rgba(185, 28, 28, 1);
+        }
+
+    </style>
+</head>
+<body>
+
+<button id="btn-back-menu" onclick="returnToMainMenu()">◄ MENU</button>
+<button id="audio-toggle" onclick="toggleAudio()">🔊 AUDIO: OFF</button>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="800" height="450"></canvas>
+    
+    <!-- HUD -->
+    <div id="hud">
+        <div class="flex flex-col gap-2 ml-24">
+            <div id="scoreDisplay">SKOR: 0</div>
+            <div id="livesDisplay">NYAWA: 5</div>
+        </div>
+        <div id="locationDisplay" class="text-right text-yellow-300 text-[9px] md:text-[10px] mt-10 mr-1">JERAM TOI</div>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div id="mobile-controls">
+        <div class="controls-left">
+            <div class="control-btn" id="btn-left">◄</div>
+            <div class="control-btn" id="btn-right">►</div>
+        </div>
+        <div class="control-btn" id="btn-jump">▲</div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="overlay" style="display: flex;">
+        <h1 class="pixel-text text-3xl md:text-4xl text-yellow-400 mb-4">TIGA LOKASI JELEBU</h1>
+        <h2 class="pixel-text text-xl md:text-2xl text-green-400 mb-8">JUNGLE ADVENTURE</h2>
+        <div class="bg-black/50 p-6 rounded-lg max-w-md text-left text-sm font-semibold mb-6 border-2 border-gray-600">
+            <p class="mb-2">📍 KAWALAN:</p>
+            <p class="mb-2">- PC: Anak Panah (Kiri/Kanan), Space (Lompat)</p>
+            <p class="mb-4">- Telefon: Butang pada skrin</p>
+            <p class="mb-2">📍 MISI:</p>
+            <p>- Kumpul bintang (10 mata).</p>
+            <p>- Jawab soalan di papan tanda (100 mata).</p>
+            <p>- Sampai ke bendera penamat!</p>
+        </div>
+        <button class="btn-retro" onclick="startGame()">MULA PENGEMBARAAN</button>
+    </div>
+
+    <!-- Quiz Overlay -->
+    <div id="quiz-overlay" class="overlay" style="background: rgba(0,0,0,0.7);">
+        <div id="quiz-panel">
+            <h3 id="quiz-question" class="text-lg md:text-xl font-bold mb-2">Soalan?</h3>
+            <div id="quiz-options" class="flex flex-col gap-3">
+                <!-- Options populated via JS -->
+            </div>
+            
+            <!-- TAHUKAH ANDA Fact Card -->
+            <div id="fact-card">
+                <div class="fact-header">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <span>TAHUKAH ANDA?</span>
+                </div>
+                <p id="fact-text" class="text-sm font-semibold leading-relaxed"></p>
+            </div>
+
+            <div id="quiz-feedback" class="hidden mt-4 p-4 rounded-lg text-sm font-semibold"></div>
+            <div class="flex gap-2 justify-end mt-2">
+                <button class="bg-gray-600 text-white font-bold px-4 py-3 rounded-lg hover:bg-gray-700 transition font-sans text-xs" onclick="returnToMainMenu()">Menu Utama</button>
+                <button id="quiz-next-btn" class="hidden bg-[#2E7D32] text-white font-bold py-3 px-4 rounded-lg border-[3px] border-[#1b4d1e] hover:bg-[#388E3C] transition" onclick="closeQuiz()">Faham, Teruskan</button>
+                <button id="quiz-retry-btn" class="hidden bg-orange-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-orange-600 transition" onclick="resetQuiz()">Cuba Lagi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="overlay">
+        <h1 class="pixel-text text-4xl text-red-500 mb-4">PERMAINAN TAMAT</h1>
+        <p class="text-xl mb-6">Jangan putus asa, mari cuba lagi!</p>
+        <div class="flex gap-4">
+            <button class="btn-retro" onclick="resetGame(true)">MAIN SEMULA</button>
+            <button class="btn-retro" style="background-color: #607d8b;" onclick="returnToMainMenu()">MENU UTAMA</button>
+        </div>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="overlay" style="overflow-y: auto; justify-content: flex-start; padding-top: 40px; padding-bottom: 40px;">
+        <h1 class="pixel-text text-2xl md:text-3xl text-yellow-400 mb-3 leading-tight">TAHNIAH!<br>ANDA BERJAYA MENEROKA JELEBU</h1>
+        <p id="final-score" class="pixel-text text-lg md:text-xl text-white mb-1 mt-2">MARKAH: 0</p>
+        <p id="high-score-display" class="pixel-text text-sm text-green-300 mb-4">SKOR TERTINGGI: 0</p>
+        
+        <div class="passport-stamps mb-4" style="margin-top: 5px;">
+            <div id="stamp-1" class="stamp" style="width: 70px; height: 70px; font-size: 10px;">JERAM TOI</div>
+            <div id="stamp-2" class="stamp" style="width: 70px; height: 70px; font-size: 10px;">TAMAN KENABOI</div>
+            <div id="stamp-3" class="stamp" style="width: 70px; height: 70px; font-size: 10px;">MUZIUM ADAT</div>
+        </div>
+
+        <!-- Ganjaran Kupon -->
+        <div id="reward-coupon">
+            <div class="text-xs font-extrabold uppercase tracking-wider text-amber-600 mb-1">GANJARAN EKSKLUSIF PENEROKA</div>
+            <h2 class="text-lg md:text-xl font-black text-amber-900">BAUCAR DISKAUN 20% PELANCONGAN JELEBU</h2>
+            <p class="text-xs text-amber-800 mt-1">Sah untuk tiket masuk, cenderamata & aktiviti rekreasi terpilih di daerah Jelebu.</p>
+            
+            <div class="my-2">
+                <div id="coupon-code" class="coupon-code-box">JELEBU-2026</div>
+            </div>
+            
+            <button id="copy-coupon-btn" onclick="copyCouponCode()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded text-xs transition shadow">
+                SALIN KOD KUPON
+            </button>
+            <div id="copy-feedback" class="text-xs text-green-700 font-bold mt-1 hidden">Kod berjaya disalin!</div>
+        </div>
+
+        <h3 class="text-yellow-300 font-bold mb-2 text-sm">FAKTA YANG TELAH DIPELAJARI:</h3>
+        <ul id="learned-facts-container" style="max-height: 160px;">
+            <!-- Facts list populated here -->
+        </ul>
+
+        <div class="flex gap-4 pb-6">
+            <button class="btn-retro" onclick="resetGame(true)">MAIN SEMULA</button>
+            <button class="btn-retro" style="background-color: #607d8b;" onclick="returnToMainMenu()">MENU UTAMA</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Make canvas scale cleanly
+    function resizeCanvas() {
+        const container = document.getElementById('game-container');
+        const aspect = 800 / 450;
+        let w = container.clientWidth;
+        let h = container.clientHeight;
+        
+        if (w / h > aspect) {
+            canvas.style.width = (h * aspect) + 'px';
+            canvas.style.height = h + 'px';
+        } else {
+            canvas.style.width = w + 'px';
+            canvas.style.height = (w / aspect) + 'px';
+        }
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Game Variables
+    const GRAVITY = 0.5;
+    const JUMP_FORCE = -10;
+    const SPEED = 4;
+    
+    let gameState = 'START'; // START, PLAYING, QUIZ, GAMEOVER, VICTORY
+    let currentLevel = 0;
+    let score = 0;
+    let highScore = 0;
+    let lives = 5;
+    let cameraX = 0;
+    let animationFrameId;
+    let particles = [];
+    let msgTimer = 0;
+    let msgText = "";
+    let lastFrameTime = 0;
+    const TARGET_FPS = 60;
+    const FRAME_STEP = 1000 / TARGET_FPS;
+
+    // --- AUDIO SYSTEM (Web Audio API) ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+    let isAudioEnabled = false;
+    
+    // BGM Sequencer Variables
+    let bgmTimeoutId = null;
+    let isPlayingBGM = false;
+    let noteIndex = 0;
+    let nextNoteTime = 0;
+
+    // Waterfall SFX Synthesizer Variables
+    let waterfallNoiseNode = null;
+    let waterfallFilterNode = null;
+    let waterfallGainNode = null;
+    let isWaterfallAudioRunning = false;
+    
+    // Melodi 8-bit retro yang santai & ceria (Frekuensi not dalam Hz)
+    const melody = [
+        261.63, 329.63, 392.00, 329.63, // C4, E4, G4, E4
+        349.23, 440.00, 523.25, 440.00, // F4, A4, C5, A4
+        392.00, 329.63, 261.63, 329.63, // G4, E4, C4, E4
+        293.66, 349.23, 392.00, 293.66  // D4, F4, G4, D4
+    ];
+    const noteLength = 0.25; // Kelajuan tempo (0.25 saat)
+
+    function toggleAudio() {
+        isAudioEnabled = !isAudioEnabled;
+        const btn = document.getElementById('audio-toggle');
+        
+        if (isAudioEnabled) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            btn.innerText = "🔊 AUDIO: ON";
+            btn.style.borderColor = "#4CAF50";
+            btn.style.color = "#4CAF50";
+            if (gameState === 'PLAYING') {
+                startBGM();
+            }
+        } else {
+            btn.innerText = "🔇 AUDIO: OFF";
+            btn.style.borderColor = "white";
+            btn.style.color = "white";
+            stopBGM();
+        }
+    }
+
+    function playSFX(type) {
+        if (!isAudioEnabled || audioCtx.state === 'suspended') return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+
+        if (type === 'jump') {
+            // Bunyi retro pendek
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+            gain.gain.setValueAtTime(0.05, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.2);
+            osc.start(now);
+            osc.stop(now + 0.2);
+        } else if (type === 'star') {
+            // Bunyi 'ting'
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.setValueAtTime(1200, now + 0.05);
+            gain.gain.setValueAtTime(0.05, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.15);
+            osc.start(now);
+            osc.stop(now + 0.15);
+        } else if (type === 'correct') {
+            // Bunyi kejayaan
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.setValueAtTime(523.25, now + 0.1); // C5
+            osc.frequency.setValueAtTime(659.25, now + 0.2); // E5
+            gain.gain.setValueAtTime(0.05, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.4);
+            osc.start(now);
+            osc.stop(now + 0.4);
+        } else if (type === 'wrong') {
+            // Bunyi kesilapan lembut
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(250, now);
+            osc.frequency.linearRampToValueAtTime(150, now + 0.3);
+            gain.gain.setValueAtTime(0.05, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            osc.start(now);
+            osc.stop(now + 0.3);
+        }
+    }
+
+    function scheduleBGM() {
+        if (!isPlayingBGM) return;
+        
+        while (nextNoteTime < audioCtx.currentTime + 0.1) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.value = melody[noteIndex];
+            
+            // Bunyi dikawal lembut dan tidak tajam
+            gain.gain.setValueAtTime(0.015, nextNoteTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, nextNoteTime + noteLength - 0.05);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start(nextNoteTime);
+            osc.stop(nextNoteTime + noteLength);
+            
+            nextNoteTime += noteLength;
+            noteIndex = (noteIndex + 1) % melody.length;
+        }
+        bgmTimeoutId = setTimeout(scheduleBGM, 25);
+    }
+
+    function initWaterfallAudio() {
+        if (waterfallNoiseNode || !audioCtx) return;
+
+        // Generate Brown Noise buffer for soft water rumble
+        const bufferSize = audioCtx.sampleRate * 2;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        let lastOut = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            output[i] = (lastOut + (0.02 * white)) / 1.02;
+            lastOut = output[i];
+            output[i] *= 3.5; // Gain boost for brown noise
+        }
+
+        waterfallNoiseNode = audioCtx.createBufferSource();
+        waterfallNoiseNode.buffer = noiseBuffer;
+        waterfallNoiseNode.loop = true;
+
+        // Lowpass filter to simulate rushing water sound
+        waterfallFilterNode = audioCtx.createBiquadFilter();
+        waterfallFilterNode.type = 'lowpass';
+        waterfallFilterNode.frequency.value = 600;
+
+        waterfallGainNode = audioCtx.createGain();
+        waterfallGainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
+
+        waterfallNoiseNode.connect(waterfallFilterNode);
+        waterfallFilterNode.connect(waterfallGainNode);
+        waterfallGainNode.connect(audioCtx.destination);
+
+        waterfallNoiseNode.start();
+        isWaterfallAudioRunning = true;
+    }
+
+    function updateWaterfallSound() {
+        if (!isAudioEnabled || gameState !== 'PLAYING' || currentLevel !== 0 || !currentLvlData) {
+            if (waterfallGainNode && audioCtx && waterfallGainNode.gain.value > 0.001) {
+                waterfallGainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+            }
+            return;
+        }
+
+        if (!isWaterfallAudioRunning) {
+            initWaterfallAudio();
+        }
+
+        // Find nearest waterfall in Level 1
+        let minDistance = 9999;
+        const playerCenterX = player.x + player.w / 2;
+
+        currentLvlData.scenery.forEach(s => {
+            if (s.type === 'waterfall') {
+                const wfCenterX = s.x + 50; // Waterfall width is 100
+                const dist = Math.abs(playerCenterX - wfCenterX);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                }
+            }
+        });
+
+        // Radius of hearing: 300px
+        const maxRadius = 300;
+        if (minDistance < maxRadius && waterfallGainNode) {
+            const proximity = 1 - (minDistance / maxRadius);
+            const targetVolume = Math.pow(proximity, 1.5) * 0.12; // Max volume 0.12 for pleasant ambient
+            waterfallGainNode.gain.setTargetAtTime(targetVolume, audioCtx.currentTime, 0.1);
+        } else if (waterfallGainNode) {
+            waterfallGainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        }
+    }
+
+    function startBGM() {
+        if (!isAudioEnabled || isPlayingBGM) return;
+        isPlayingBGM = true;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        nextNoteTime = audioCtx.currentTime + 0.05;
+        noteIndex = 0;
+        scheduleBGM();
+    }
+
+    function stopBGM() {
+        isPlayingBGM = false;
+        if (bgmTimeoutId) {
+            clearTimeout(bgmTimeoutId);
+            bgmTimeoutId = null;
+        }
+        if (waterfallGainNode && audioCtx) {
+            waterfallGainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        }
+    }
+
+    // Keys
+    const keys = { left: false, right: false, up: false };
+
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'ArrowLeft') keys.left = true;
+        if (e.code === 'ArrowRight') keys.right = true;
+        if (e.code === 'Space' || e.code === 'ArrowUp') keys.up = true;
+    });
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'ArrowLeft') keys.left = false;
+        if (e.code === 'ArrowRight') keys.right = false;
+        if (e.code === 'Space' || e.code === 'ArrowUp') keys.up = false;
+    });
+
+    // Mobile touch
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+    const btnJump = document.getElementById('btn-jump');
+
+    const addTouch = (elem, keyName) => {
+        elem.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyName] = true; });
+        elem.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyName] = false; });
+    };
+    addTouch(btnLeft, 'left');
+    addTouch(btnRight, 'right');
+    addTouch(btnJump, 'up');
+
+    // Player Object (Adventurer Style)
+    const player = {
+        x: 50, y: 100, w: 30, h: 48, vx: 0, vy: 0, grounded: false,
+        startX: 50, startY: 100, lastSafeX: 50, lastSafeY: 100,
+        colorShirt: '#F5F5DC', colorVest: '#4CAF50', colorPants: '#8D6E63', colorHat: '#D7CCC8', colorPack: '#5D4037', colorBoots: '#3E2723',
+        dir: 1 // 1 right, -1 left
+    };
+
+    // Quiz Data - NEW EDUCATIONAL QUESTIONS
+    const quizData = [
+        [ // Level 0: Jeram Toi
+            {
+                q: "Jeram Toi merupakan salah satu tarikan rekreasi alam semula jadi di Jelebu. Apakah proses semula jadi yang membantu membentuk jeram dan air terjun?",
+                opts: ["A. Hakisan batuan oleh aliran air sungai", "B. Pembinaan jalan raya", "C. Tiupan angin di kawasan bandar"],
+                ans: 0,
+                fact: "Air terjun dan jeram terbentuk melalui proses geologi serta hakisan batuan oleh aliran air dalam tempoh yang panjang. Perbezaan ketahanan batuan boleh menghasilkan perubahan ketinggian pada dasar sungai."
+            },
+            {
+                q: "Ketika melawat Jeram Toi, apakah tanda yang boleh menunjukkan risiko kepala air?",
+                opts: ["A. Langit cerah sepanjang hari", "B. Air sungai tiba-tiba menjadi keruh, meningkat atau membawa banyak ranting", "C. Bunyi burung di kawasan hutan"],
+                ans: 1,
+                fact: "Kepala air boleh berlaku apabila aliran air deras datang secara tiba-tiba dari kawasan hulu, termasuk akibat hujan lebat di tempat lain. Jika air berubah secara mendadak, segera jauhi sungai dan bergerak ke tempat tinggi yang selamat."
+            }
+        ],
+        [ // Level 1: Kenaboi
+            {
+                q: "Taman Negeri Kenaboi terkenal sebagai kawasan pemuliharaan alam semula jadi. Apakah fungsi penting hutan dalam menjaga keseimbangan ekosistem?",
+                opts: ["A. Menyediakan habitat hidupan liar dan membantu melindungi kawasan tadahan air", "B. Menghasilkan pencemaran udara", "C. Menghapuskan semua tumbuhan kecil"],
+                ans: 0,
+                fact: "Hutan tropika memainkan peranan penting sebagai habitat pelbagai spesies tumbuhan dan haiwan. Kawasan hutan juga membantu mengekalkan kitaran air serta mengurangkan hakisan tanah."
+            },
+            {
+                q: "Jika pelancong ingin melakukan aktiviti pendakian di kawasan Taman Negeri Kenaboi, apakah tindakan paling penting sebelum memulakan perjalanan?",
+                opts: ["A. Memasuki laluan hutan tanpa memberitahu sesiapa", "B. Menyemak status laluan, syarat permit dan keperluan pemandu dengan pihak pengurusan", "C. Mengikuti mana-mana laluan yang kelihatan menarik"],
+                ans: 1,
+                fact: "Sesetengah laluan pendakian dan kawasan hutan perlindungan mempunyai syarat akses tertentu. Pelancong perlu menyemak kebenaran masuk, keadaan cuaca, tahap kesukaran dan keperluan pemandu sebelum melakukan aktiviti."
+            }
+        ],
+        [ // Level 2: Muzium
+            {
+                q: "Negeri Sembilan terkenal dengan amalan Adat Perpatih. Apakah ciri utama sistem kekeluargaan dalam adat ini?",
+                opts: ["A. Keturunan mengikut sebelah ibu", "B. Keturunan mengikut sebelah bapa sahaja", "C. Keturunan tidak mempunyai sebarang hubungan kekeluargaan"],
+                ans: 0,
+                fact: "Adat Perpatih mengamalkan sistem keturunan matrilineal, iaitu susur galur keluarga mengikut sebelah ibu. Adat ini merupakan salah satu warisan budaya penting masyarakat Negeri Sembilan."
+            },
+            {
+                q: "Mengapakah muzium adat penting kepada pelancong yang ingin memahami identiti masyarakat Jelebu?",
+                opts: ["A. Kerana muzium hanya menyediakan hiburan", "B. Kerana muzium menggantikan semua tempat rekreasi", "C. Kerana muzium membantu pengunjung memahami sejarah, adat dan warisan masyarakat tempatan"],
+                ans: 2,
+                fact: "Muzium adat berperanan memperkenalkan warisan budaya kepada generasi baharu dan pelawat. Melalui bahan pameran serta penerangan sejarah, pengunjung dapat memahami identiti dan tradisi masyarakat tempatan."
+            }
+        ]
+    ];
+
+    let currentQuizIndex = 0;
+    let activeSign = null;
+
+    // Level Data Objects
+    const levels = [];
+
+    // Helper to generate levels to keep code clean
+    function buildLevel(index) {
+        let l = { platforms: [], stars: [], signs: [], scenery: [], clouds: [], flag: null, bgColor: '', name: '' };
+        
+        // Base ground everywhere for easier gameplay, just some pits
+        const createPlat = (x, y, w, h, type='ground') => l.platforms.push({x, y, w, h, type});
+        const createStar = (x, y) => l.stars.push({x, y, w: 20, h: 20, collected: false});
+        const createSign = (x, y, qIdx) => l.signs.push({x, y, w: 30, h: 40, qIdx: qIdx, answered: false});
+        const createScenery = (x, y, type) => l.scenery.push({x, y, type});
+        const createCloud = (x, y) => l.clouds.push({x, y, speed: 0.2 + Math.random()*0.3});
+
+        if (index === 0) {
+            l.name = "LEVEL 1: JERAM TOI";
+            l.bgColor = "#87CEEB"; // Sky blue
+            
+            // Scenery & Clouds
+            createCloud(100, 50); createCloud(500, 80); createCloud(1200, 60); createCloud(1800, 90);
+            createScenery(300, 150, 'waterfall');
+            createScenery(1100, 150, 'waterfall');
+            createScenery(700, 250, 'tree');
+
+            // Bigger Platforms for easy jumps
+            createPlat(0, 350, 700, 100, 'rock');
+            createStar(300, 280);
+            
+            createPlat(800, 350, 600, 100, 'rock');
+            createSign(900, 310, 0); // Q1
+            createStar(1150, 280);
+
+            createPlat(1500, 350, 800, 100, 'rock');
+            createSign(1600, 310, 1); // Q2
+            
+            l.flag = {x: 2100, y: 250, w: 40, h: 100};
+        } 
+        else if (index === 1) {
+            l.name = "LEVEL 2: TAMAN NEGERI KENABOI";
+            l.bgColor = "#A5D6A7"; // Forest green tint
+            
+            createCloud(200, 60); createCloud(800, 40); createCloud(1500, 70);
+            createScenery(150, 200, 'talltree');
+            createScenery(600, 180, 'talltree');
+            createScenery(1200, 200, 'talltree');
+            createScenery(1800, 180, 'talltree');
+
+            createPlat(0, 380, 800, 100, 'dirt');
+            createStar(400, 310);
+            createSign(600, 340, 0); // Q3
+
+            createPlat(900, 380, 600, 100, 'dirt');
+            createStar(1100, 310);
+            createSign(1300, 340, 1); // Q4
+
+            createPlat(1600, 380, 700, 100, 'dirt');
+            l.flag = {x: 2100, y: 280, w: 40, h: 100};
+        }
+        else if (index === 2) {
+            l.name = "LEVEL 3: MUZIUM ADAT JELEBU";
+            l.bgColor = "#FFE0B2"; // Sunset/Warm
+            
+            createCloud(300, 50); createCloud(1000, 80); createCloud(1700, 60);
+            createScenery(500, 150, 'muzium');
+            createScenery(1500, 150, 'muzium');
+
+            createPlat(0, 400, 900, 50, 'stone');
+            createStar(400, 330);
+            createSign(700, 360, 0); // Q5
+
+            createPlat(1000, 400, 900, 50, 'stone');
+            createStar(1200, 330);
+            createSign(1400, 360, 1); // Q6
+            
+            createPlat(2000, 400, 500, 50, 'stone');
+            l.flag = {x: 2200, y: 300, w: 40, h: 100};
+        }
+
+        return l;
+    }
+
+    let currentLvlData = null;
+
+    // Load Level
+    function loadLevel(index) {
+        currentLevel = index;
+        currentLvlData = buildLevel(index);
+        particles = []; // Bersihkan zarah lama untuk elak lag
+        
+        player.x = 50;
+        player.y = 100;
+        player.vx = 0;
+        player.vy = 0;
+        player.lastSafeX = 50;
+        player.lastSafeY = 100;
+        cameraX = 0;
+        
+        updateHUD();
+    }
+
+    // Drawing Helpers (Pixel Art Style via Rectangles)
+    function drawPlayer(x, y, dir) {
+        let isMoving = Math.abs(player.vx) > 0.1;
+        let isJumping = !player.grounded;
+        let t = Date.now();
+        let legOffset = isMoving && !isJumping ? Math.sin(t / 100) * 4 : 0;
+        let armOffset = isMoving && !isJumping ? Math.cos(t / 100) * 3 : 0;
+        
+        // Back Arm
+        ctx.fillStyle = '#ffccaa';
+        ctx.fillRect(x + (dir===1 ? 8 : 18) - armOffset, y + 22, 6, 12);
+
+        // Body (Shirt & Vest)
+        ctx.fillStyle = player.colorShirt;
+        ctx.fillRect(x + 5, y + 18, 20, 17);
+        ctx.fillStyle = player.colorVest; // Safari Vest
+        ctx.fillRect(x + (dir===1 ? 5 : 15), y + 18, 10, 17);
+        
+        // Pants & Boots
+        ctx.fillStyle = player.colorPants;
+        if (isJumping) {
+            ctx.fillRect(x + 2, y + 35, 10, 8);
+            ctx.fillRect(x + 18, y + 35, 10, 8);
+            ctx.fillStyle = player.colorBoots;
+            ctx.fillRect(x + 2, y + 43, 10, 6);
+            ctx.fillRect(x + 18, y + 43, 10, 6);
+        } else {
+            ctx.fillRect(x + 4 - legOffset, y + 35, 10, 8);
+            ctx.fillRect(x + 16 + legOffset, y + 35, 10, 8);
+            ctx.fillStyle = player.colorBoots;
+            ctx.fillRect(x + 4 - legOffset + (dir===1?2:-2), y + 43, 10, 6);
+            ctx.fillRect(x + 16 + legOffset + (dir===1?2:-2), y + 43, 10, 6);
+        }
+        
+        // Head
+        ctx.fillStyle = '#ffccaa'; // skin
+        ctx.fillRect(x + 5, y + 6, 20, 14);
+        
+        // Safari Hat
+        ctx.fillStyle = player.colorHat;
+        ctx.fillRect(x + 2, y + 2, 26, 6); // Hat crown
+        ctx.fillRect(x - 4, y + 6, 38, 3); // Hat brim
+        
+        // Eyes
+        ctx.fillStyle = '#000';
+        if (dir === 1) {
+            ctx.fillRect(x + 18, y + 10, 3, 3);
+        } else {
+            ctx.fillRect(x + 9, y + 10, 3, 3);
+        }
+        
+        // Backpack
+        ctx.fillStyle = player.colorPack;
+        if (dir === 1) {
+            ctx.fillRect(x - 4, y + 18, 9, 16);
+            ctx.fillRect(x - 2, y + 22, 12, 10);
+        } else {
+            ctx.fillRect(x + 25, y + 18, 9, 16);
+            ctx.fillRect(x + 20, y + 22, 12, 10);
+        }
+
+        // Front Arm
+        ctx.fillStyle = '#ffccaa';
+        ctx.fillRect(x + (dir===1 ? 16 : 6) + armOffset, y + 22, 6, 12);
+    }
+
+    function drawPlatform(p) {
+        ctx.fillStyle = p.type === 'rock' ? '#78909C' : 
+                        p.type === 'dirt' ? '#795548' : 
+                        p.type === 'stone' ? '#B0BEC5' : '#8D6E63';
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+
+        // Top grass/trim
+        ctx.fillStyle = p.type === 'rock' || p.type === 'dirt' ? '#4CAF50' : '#CFD8DC';
+        if (p.type !== 'wood') {
+            ctx.fillRect(p.x, p.y, p.w, 10);
+            // Little grass bits hanging
+            if(p.type === 'rock' || p.type === 'dirt') {
+                for(let i=0; i<p.w; i+=15) {
+                    if(i%2==0) ctx.fillRect(p.x + i, p.y + 10, 8, 5);
+                }
+            }
+        }
+    }
+
+    function drawStar(x, y) {
+        ctx.fillStyle = '#FFD700';
+        // Simple star pixel approximation
+        ctx.fillRect(x + 8, y, 4, 20);
+        ctx.fillRect(x, y + 8, 20, 4);
+        ctx.fillRect(x + 4, y + 4, 12, 12);
+    }
+
+    function drawSign(x, y) {
+        ctx.fillStyle = '#5D4037'; // Post
+        ctx.fillRect(x + 12, y + 15, 6, 25);
+        ctx.fillStyle = '#D7CCC8'; // Board
+        ctx.fillRect(x, y, 30, 20);
+        ctx.fillStyle = '#D32F2F'; // ? Mark
+        ctx.font = "14px 'Press Start 2P'";
+        ctx.fillText("?", x + 8, y + 16);
+    }
+
+    function drawFlag(x, y, w, h) {
+        ctx.fillStyle = '#BDBDBD'; // Pole
+        ctx.fillRect(x + 5, y, 6, h);
+        ctx.fillStyle = '#F44336'; // Flag
+        ctx.fillRect(x + 11, y + 5, 25, 20);
+    }
+
+    function drawScenery(s) {
+        if (s.type === 'waterfall') {
+            let t = Date.now() / 150;
+            let wfWidth = 100;
+            let topY = s.y - 120; // Air bermula dari tebing tinggi
+            let bottomY = 350; // Dasar air terjun bersambung dengan platform
+            
+            // 1. Latar Belakang Tebing Berbatu
+            ctx.fillStyle = '#4E342E';
+            ctx.fillRect(s.x - 30, topY, wfWidth + 60, bottomY - topY);
+
+            // 2. Batu dan Pokok di Kiri dan Kanan Air Terjun
+            ctx.fillStyle = '#607D8B'; // Kelabu kebiruan (Batu)
+            // Batu Kiri
+            ctx.fillRect(s.x - 40, topY + 20, 30, 50);
+            ctx.fillRect(s.x - 50, topY + 80, 40, 60);
+            ctx.fillRect(s.x - 35, topY + 160, 35, 80);
+            ctx.fillRect(s.x - 45, topY + 250, 45, bottomY - (topY + 250));
+            // Batu Kanan
+            ctx.fillRect(s.x + wfWidth + 10, topY + 10, 30, 40);
+            ctx.fillRect(s.x + wfWidth, topY + 60, 40, 70);
+            ctx.fillRect(s.x + wfWidth + 10, topY + 150, 35, 90);
+            ctx.fillRect(s.x + wfWidth, topY + 260, 40, bottomY - (topY + 260));
+
+            // Pokok Renik & Lumut Hijau
+            ctx.fillStyle = '#2E7D32'; 
+            ctx.fillRect(s.x - 55, topY + 70, 20, 20);
+            ctx.fillRect(s.x - 45, topY + 170, 25, 25);
+            ctx.fillRect(s.x + wfWidth + 25, topY + 50, 20, 30);
+            ctx.fillRect(s.x + wfWidth + 30, topY + 200, 20, 20);
+            ctx.fillStyle = '#4CAF50'; 
+            ctx.fillRect(s.x - 50, topY + 75, 10, 10);
+            ctx.fillRect(s.x + wfWidth + 20, topY + 55, 15, 15);
+
+            // Puncak Air Terjun (Batu di atas)
+            ctx.fillStyle = '#3E2723';
+            ctx.fillRect(s.x - 10, topY, wfWidth + 20, 20);
+
+            // 3. Air Mengalir
+            ctx.fillStyle = '#0288D1'; // Biru gelap
+            ctx.fillRect(s.x, topY + 10, wfWidth, bottomY - topY - 10);
+            ctx.fillStyle = '#03A9F4'; // Biru medium
+            ctx.fillRect(s.x + 10, topY + 10, wfWidth - 20, bottomY - topY - 10);
+            ctx.fillStyle = '#29B6F6'; // Biru cerah
+            ctx.fillRect(s.x + 25, topY + 10, wfWidth - 50, bottomY - topY - 10);
+
+            // Jalur air putih bergerak (Animasi)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            for(let i=0; i<5; i++) {
+                let streamLen = 30 + (i % 2) * 20;
+                let dropY = topY + 10 + ((t * 40 + i * 50) % (bottomY - topY - 10));
+                ctx.fillRect(s.x + 15 + i*15, dropY, 6, streamLen);
+                
+                let dropY2 = topY + 10 + ((t * 60 + i * 30 + 100) % (bottomY - topY - 10));
+                ctx.fillRect(s.x + 12 + i*16, dropY2, 3, streamLen * 0.6);
+            }
+
+            // 4. Kolam Dasar & Buih Percikan
+            ctx.fillStyle = '#0288D1';
+            ctx.fillRect(s.x - 30, bottomY - 15, wfWidth + 60, 25);
+            ctx.fillStyle = '#03A9F4';
+            ctx.fillRect(s.x - 20, bottomY - 10, wfWidth + 40, 20);
+            
+            // Animasi percikan membuak
+            ctx.fillStyle = '#E1F5FE';
+            for(let j=0; j<8; j++) {
+                let splashH = 8 + Math.abs(Math.sin(t + j)) * 12;
+                let splashY = bottomY - splashH - 5;
+                ctx.fillRect(s.x + 5 + j * (wfWidth/8), splashY, (wfWidth/8) - 2, splashH);
+                
+                // Titik air melompat naik
+                let dropH = bottomY - 15 - Math.abs(Math.cos(t * 1.5 + j)) * 25;
+                ctx.fillRect(s.x + 8 + j * (wfWidth/8), dropH, 4, 4);
+            }
+        }
+        else if (s.type === 'tree' || s.type === 'talltree') {
+            const th = s.type === 'talltree' ? 250 : 150;
+            ctx.fillStyle = '#5D4037';
+            ctx.fillRect(s.x, s.y + (300-th), 30, th);
+            ctx.fillStyle = '#2E7D32';
+            ctx.fillRect(s.x - 40, s.y + (280-th), 110, 80);
+            ctx.fillRect(s.x - 20, s.y + (220-th), 70, 70);
+        }
+        else if (s.type === 'muzium') {
+            // Minangkabau roof style
+            ctx.fillStyle = '#FFE0B2'; // wall
+            ctx.fillRect(s.x + 20, s.y + 100, 160, 100);
+            ctx.fillStyle = '#8D6E63'; // roof
+            ctx.beginPath();
+            ctx.moveTo(s.x - 20, s.y + 100);
+            ctx.lineTo(s.x + 100, s.y);
+            ctx.lineTo(s.x + 220, s.y + 100);
+            ctx.fill();
+            // Roof horns
+            ctx.beginPath();
+            ctx.moveTo(s.x - 20, s.y + 100);
+            ctx.lineTo(s.x - 30, s.y + 40);
+            ctx.lineTo(s.x + 20, s.y + 90);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(s.x + 220, s.y + 100);
+            ctx.lineTo(s.x + 230, s.y + 40);
+            ctx.lineTo(s.x + 180, s.y + 90);
+            ctx.fill();
+        }
+    }
+
+    // AABB Collision
+    function checkCollision(r1, r2) {
+        return (r1.x < r2.x + r2.w &&
+                r1.x + r1.w > r2.x &&
+                r1.y < r2.y + r2.h &&
+                r1.y + r1.h > r2.y);
+    }
+
+    // Main Update Loop
+    function update(dtScale = 1) {
+        if (gameState !== 'PLAYING') return;
+
+        // Update spatial waterfall sound effect
+        updateWaterfallSound();
+
+        // Clouds movement
+        if (currentLvlData && currentLvlData.clouds) {
+            currentLvlData.clouds.forEach(c => {
+                c.x -= c.speed * dtScale;
+                if(c.x < -100) c.x = 2500;
+            });
+        }
+
+        // Messages timer
+        if (msgTimer > 0) msgTimer -= dtScale;
+
+        // Horizontal Movement
+        if (keys.left) {
+            player.vx = -SPEED;
+            player.dir = -1;
+        } else if (keys.right) {
+            player.vx = SPEED;
+            player.dir = 1;
+        } else {
+            player.vx = 0;
+        }
+
+        player.vy += GRAVITY * dtScale;
+        if (keys.up && player.grounded) {
+            player.vy = JUMP_FORCE;
+            player.grounded = false;
+            playSFX('jump');
+        }
+
+        // Apply X movement and check horizontal collision
+        player.x += player.vx * dtScale;
+        // Prevent going left of level start
+        if (player.x < 0) player.x = 0;
+
+        for (let p of currentLvlData.platforms) {
+            if (checkCollision(player, p)) {
+                if (player.vx > 0) player.x = p.x - player.w; // Hit left
+                else if (player.vx < 0) player.x = p.x + p.w; // Hit right
+                player.vx = 0;
+            }
+        }
+
+        // Apply Y movement and check vertical collision
+        player.y += player.vy * dtScale;
+        player.grounded = false;
+        
+        let onSafePlatform = false;
+
+        for (let p of currentLvlData.platforms) {
+            if (checkCollision(player, p)) {
+                if (player.vy > 0) { // Falling
+                    player.y = p.y - player.h;
+                    player.vy = 0;
+                    player.grounded = true;
+                    onSafePlatform = true;
+                } else if (player.vy < 0) { // Jumping into ceiling
+                    player.y = p.y + p.h;
+                    player.vy = 0;
+                }
+            }
+        }
+
+        if (onSafePlatform) {
+            player.lastSafeX = player.x;
+            player.lastSafeY = player.y;
+        }
+
+        // Death by falling
+        if (player.y > canvas.height + 50) {
+            lives--;
+            updateHUD();
+            if (lives <= 0) {
+                gameState = 'GAMEOVER';
+                stopBGM(); // Hentikan muzik bila mati
+                document.getElementById('game-over-screen').style.display = 'flex';
+            } else {
+                player.x = player.lastSafeX;
+                player.y = player.lastSafeY - 10;
+                player.vy = 0;
+            }
+        }
+
+        // Camera follow
+        let targetCamX = player.x - canvas.width / 3;
+        if (targetCamX < 0) targetCamX = 0;
+        cameraX += (targetCamX - cameraX) * 0.15 * dtScale; // Kamera menyusur lebih lembut (smooth lerp)
+
+        // Collect Stars
+        for (let s of currentLvlData.stars) {
+            if (!s.collected && checkCollision(player, s)) {
+                s.collected = true;
+                score += 10;
+                playSFX('star');
+                updateHUD();
+            }
+        }
+
+        // Hit Question Signs
+        for (let s of currentLvlData.signs) {
+            if (!s.answered && checkCollision(player, s)) {
+                // Trigger Quiz
+                gameState = 'QUIZ';
+                activeSign = s;
+                openQuiz(s.qIdx);
+                // Push player back slightly so they don't re-trigger immediately if logic fails
+                player.vx = 0;
+                keys.left = false; keys.right = false; keys.up = false;
+                break;
+            }
+        }
+
+        // Hit Flag
+        if (checkCollision(player, currentLvlData.flag)) {
+            let answeredCount = currentLvlData.signs.filter(s => s.answered).length;
+            if (answeredCount >= 2) {
+                levelComplete();
+            } else {
+                msgText = "Jawab 2 soalan dahulu!";
+                msgTimer = 100;
+            }
+        }
+    }
+
+    // Draw Loop
+    function draw() {
+        // Clear background
+        if (currentLvlData) {
+            ctx.fillStyle = currentLvlData.bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-cameraX, 0);
+
+            // Clouds
+            if (currentLvlData.clouds) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                currentLvlData.clouds.forEach(c => {
+                    ctx.fillRect(c.x, c.y, 60, 20);
+                    ctx.fillRect(c.x + 10, c.y - 10, 40, 10);
+                    ctx.fillRect(c.x + 20, c.y + 20, 30, 10);
+                });
+            }
+
+            // Scenery
+            currentLvlData.scenery.forEach(s => drawScenery(s));
+
+            // Platforms
+            currentLvlData.platforms.forEach(p => drawPlatform(p));
+
+            // Stars
+            currentLvlData.stars.forEach(s => {
+                if (!s.collected) drawStar(s.x, s.y);
+            });
+
+            // Signs
+            currentLvlData.signs.forEach(s => {
+                if (!s.answered) drawSign(s.x, s.y);
+            });
+
+            // Flag
+            drawFlag(currentLvlData.flag.x, currentLvlData.flag.y, currentLvlData.flag.w, currentLvlData.flag.h);
+
+            // Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy;
+                p.life -= 0.02;
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                } else {
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(p.x, p.y, 6, 6);
+                }
+            }
+            ctx.globalAlpha = 1.0;
+
+            // Player
+            if (gameState === 'PLAYING' || gameState === 'QUIZ') {
+                drawPlayer(player.x, player.y, player.dir);
+            }
+
+            // Floating Message
+            if (msgTimer > 0) {
+                ctx.fillStyle = '#fff';
+                ctx.font = "12px 'Press Start 2P'";
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#000';
+                ctx.strokeText(msgText, player.x - 50, player.y - 30 - (100 - msgTimer)/5);
+                ctx.fillText(msgText, player.x - 50, player.y - 30 - (100 - msgTimer)/5);
+            }
+
+            ctx.restore();
+            
+            // Location Name Entry Text
+            if (player.x < 300 && gameState === 'PLAYING') {
+                let alpha = Math.max(0, 1 - (player.x / 300));
+                ctx.fillStyle = `rgba(0, 0, 0, ${alpha * 0.7})`;
+                ctx.font = "14px 'Press Start 2P'";
+                ctx.fillText(currentLvlData.name, 52, 102);
+                ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.fillText(currentLvlData.name, 50, 100);
+            }
+        }
+    }
+
+    function gameLoop(timestamp) {
+        if (!lastFrameTime) lastFrameTime = timestamp;
+        const deltaTime = timestamp - lastFrameTime;
+        lastFrameTime = timestamp;
+
+        // Hadkan dtScale supaya fizik tidak melompat jika tab ditukar
+        const dtScale = Math.min(deltaTime / FRAME_STEP, 2.5);
+
+        update(dtScale);
+        draw();
+        animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    // Quiz Logic
+    function openQuiz(qIdx) {
+        stopBGM(); // Berhenti sementara untuk soalan
+        currentQuizIndex = qIdx;
+        const qData = quizData[currentLevel][qIdx];
+        
+        document.getElementById('quiz-question').innerText = qData.q;
+        const optionsContainer = document.getElementById('quiz-options');
+        optionsContainer.innerHTML = '';
+        optionsContainer.style.display = 'flex'; // Ensure options are visible
+        
+        qData.opts.forEach((opt, idx) => {
+            const div = document.createElement('div');
+            div.className = 'quiz-opt';
+            div.innerText = opt;
+            div.onclick = () => selectAnswer(idx, div);
+            optionsContainer.appendChild(div);
+        });
+
+        document.getElementById('quiz-feedback').className = 'hidden';
+        document.getElementById('fact-card').style.display = 'none';
+        document.getElementById('quiz-next-btn').classList.add('hidden');
+        document.getElementById('quiz-retry-btn').classList.add('hidden');
+        document.getElementById('quiz-overlay').style.display = 'flex';
+    }
+
+    function selectAnswer(idx, elem) {
+        // Disable clicking other options
+        const allOpts = document.querySelectorAll('.quiz-opt');
+        allOpts.forEach(opt => opt.style.pointerEvents = 'none');
+
+        const qData = quizData[currentLevel][currentQuizIndex];
+        const feedback = document.getElementById('quiz-feedback');
+
+        if (idx === qData.ans) {
+            // Correct
+            playSFX('correct');
+            elem.classList.add('correct');
+            score += 100;
+            updateHUD();
+            
+            // Hide options and feedback, show FACT CARD
+            document.getElementById('quiz-options').style.display = 'none';
+            feedback.classList.add('hidden');
+            
+            const factCard = document.getElementById('fact-card');
+            document.getElementById('fact-text').innerText = qData.fact;
+            factCard.style.display = 'block';
+
+            document.getElementById('quiz-next-btn').classList.remove('hidden');
+            if(activeSign) {
+                activeSign.answered = true;
+                // Generate particles around player
+                for(let i=0; i<30; i++) {
+                    particles.push({
+                        x: player.x + 15, y: player.y + 20,
+                        vx: (Math.random() - 0.5) * 10,
+                        vy: (Math.random() - 0.5) * 10,
+                        life: 1.0,
+                        color: ['#FFD700', '#4CAF50', '#FFF'][Math.floor(Math.random()*3)]
+                    });
+                }
+            }
+        } else {
+            // Wrong
+            playSFX('wrong');
+            elem.classList.add('wrong');
+            feedback.classList.remove('hidden');
+            feedback.innerHTML = `<span class="text-red-600 font-bold">SALAH!</span> Sila semak jawapan anda.`;
+            feedback.className = 'mt-4 p-4 rounded-lg text-sm bg-red-50 border border-red-200';
+            document.getElementById('quiz-retry-btn').classList.remove('hidden');
+        }
+    }
+
+    function closeQuiz() {
+        document.getElementById('quiz-overlay').style.display = 'none';
+        gameState = 'PLAYING';
+        startBGM(); // Sambung muzik semula
+    }
+
+    function resetQuiz() {
+        // Retry logic: just re-render options and allow click again
+        openQuiz(currentQuizIndex);
+    }
+
+    // Game Flow Controls
+    function startGame() {
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        lastFrameTime = 0;
+
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('btn-back-menu').style.display = 'block';
+        score = 0;
+        lives = 5;
+        loadLevel(0);
+        
+        // Reset stamps UI
+        for(let i=1; i<=3; i++) {
+            document.getElementById(`stamp-${i}`).classList.remove('active');
+        }
+
+        gameState = 'PLAYING';
+        if (isAudioEnabled && audioCtx.state === 'suspended') audioCtx.resume();
+        stopBGM();
+        startBGM(); // Mula muzik apabila bermain
+        animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    function returnToMainMenu() {
+        gameState = 'START';
+        stopBGM();
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        
+        // Hide overlay panels
+        document.getElementById('quiz-overlay').style.display = 'none';
+        document.getElementById('game-over-screen').style.display = 'none';
+        document.getElementById('victory-screen').style.display = 'none';
+        document.getElementById('btn-back-menu').style.display = 'none';
+        
+        // Show start screen
+        document.getElementById('start-screen').style.display = 'flex';
+        
+        // Clear canvas
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function resetGame(fullReset = false) {
+        document.getElementById('game-over-screen').style.display = 'none';
+        document.getElementById('victory-screen').style.display = 'none';
+        document.getElementById('btn-back-menu').style.display = 'block';
+        
+        if (score > highScore) highScore = score;
+
+        if (fullReset) {
+            startGame();
+        } else {
+            loadLevel(currentLevel);
+            gameState = 'PLAYING';
+            stopBGM();
+            startBGM(); // Reset muzik supaya bermula dari awal melodi
+        }
+    }
+
+    function levelComplete() {
+        gameState = 'LEVEL_COMPLETE';
+        
+        // Activate stamp for this level in UI
+        document.getElementById(`stamp-${currentLevel+1}`).classList.add('active');
+
+        if (currentLevel < 2) {
+            // Short delay then next level
+            setTimeout(() => {
+                loadLevel(currentLevel + 1);
+                gameState = 'PLAYING';
+            }, 1000);
+        } else {
+            // Game Won!
+            gameState = 'VICTORY';
+            stopBGM(); // Hentikan muzik bila menang
+            if (score > highScore) highScore = score;
+            
+            // Populate learned facts
+            const factsContainer = document.getElementById('learned-facts-container');
+            factsContainer.innerHTML = '';
+            quizData.forEach(level => {
+                level.forEach(q => {
+                    const li = document.createElement('li');
+                    li.innerText = `• ${q.fact}`;
+                    factsContainer.appendChild(li);
+                });
+            });
+
+            document.getElementById('final-score').innerText = `MARKAH KESELURUHAN: ${score}`;
+            document.getElementById('high-score-display').innerText = `SKOR TERTINGGI: ${highScore}`;
+            
+            // Jana kod kupon unik
+            const randomNum = Math.floor(1000 + Math.random() * 9000);
+            document.getElementById('coupon-code').innerText = `JELEBU-${randomNum}`;
+            document.getElementById('copy-feedback').classList.add('hidden');
+            document.getElementById('copy-coupon-btn').innerText = 'SALIN KOD KUPON';
+
+            document.getElementById('victory-screen').style.display = 'flex';
+        }
+    }
+
+    function copyCouponCode() {
+        const codeText = document.getElementById('coupon-code').innerText;
+        const tempInput = document.createElement('input');
+        tempInput.value = codeText;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+
+        const feedback = document.getElementById('copy-feedback');
+        const btn = document.getElementById('copy-coupon-btn');
+        feedback.classList.remove('hidden');
+        btn.innerText = 'DISALIN!';
+        
+        setTimeout(() => {
+            feedback.classList.add('hidden');
+            btn.innerText = 'SALIN KOD KUPON';
+        }, 3000);
+    }
+
+    function updateHUD() {
+        document.getElementById('scoreDisplay').innerText = `SKOR: ${score}`;
+        document.getElementById('livesDisplay').innerText = `NYAWA: ${lives}`;
+        if(currentLvlData) document.getElementById('locationDisplay').innerText = currentLvlData.name;
+    }
+
+    // Initial draw to avoid black screen before start
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+</script>
+</body>
+</html>
